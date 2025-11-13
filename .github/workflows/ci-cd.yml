@@ -1,0 +1,203 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # STAGE 1: BUILD
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify dependencies
+        run: |
+          echo "Dependencies installed successfully"
+          npm list --depth=0
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Show build output
+        run: |
+          echo "Build completed successfully"
+          ls -la dist/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            package*.json
+          retention-days: 7
+
+      - name: Build Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Node.js version: ${{ env.NODE_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- Artifacts uploaded" >> $GITHUB_STEP_SUMMARY
+
+  # STAGE 2: LINT & VALIDATE
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate environment configuration
+        run: |
+          echo "Validating project structure..."
+          test -f package.json || (echo "package.json not found" && exit 1)
+          test -f tsconfig.json || (echo "tsconfig.json not found" && exit 1)
+          test -f Dockerfile || (echo "Dockerfile not found" && exit 1)
+          test -f .env.example || (echo ".env.example not found" && exit 1)
+          test -d src/ || (echo "src/ directory not found" && exit 1)
+          echo "Project structure is valid"
+
+      - name: Lint Summary
+        run: |
+          echo "## Code Quality Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Project structure validated" >> $GITHUB_STEP_SUMMARY
+          echo "- All required files present" >> $GITHUB_STEP_SUMMARY
+
+  # STAGE 3: TEST
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests (placeholder)
+        run: |
+          echo "Tests stage - To be implemented"
+          echo "Future: npm test"
+
+      - name: Test Summary
+        run: |
+          echo "## Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests stage prepared for future implementation" >> $GITHUB_STEP_SUMMARY
+
+  # STAGE 4: DOCKER BUILD
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [build, lint]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: practica5-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Docker Build Summary
+        run: |
+          echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker image built successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- Tag: practica5-api:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  # STAGE 5: SECURITY SCAN
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run npm audit
+        run: |
+          npm audit --audit-level=high || echo "Vulnerabilities found"
+        continue-on-error: true
+
+      - name: Security Summary
+        run: |
+          echo "## Security Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Security scan completed" >> $GITHUB_STEP_SUMMARY
+
+  # STAGE 6: DEPLOY
+  deploy:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+    needs: [docker-build, test, security]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy (placeholder)
+        run: |
+          echo "Deploy stage - To be implemented"
+          echo "Future: Deploy to AWS, Kubernetes, etc."
+
+      - name: Deploy Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Deployment stage prepared for future implementation" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: Production" >> $GITHUB_STEP_SUMMARY

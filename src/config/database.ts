@@ -10,6 +10,10 @@ const clientConfig: any = {
     }
 };
 
+if (config.aws.sessionToken) {
+    clientConfig.credentials.sessionToken = config.aws.sessionToken;
+}
+
 if (config.aws.endpoint) {
     clientConfig.endpoint = config.aws.endpoint;
 }

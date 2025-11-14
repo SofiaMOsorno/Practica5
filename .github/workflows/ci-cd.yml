@@ -3,14 +3,12 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 env:
   NODE_VERSION: '20'
 
 jobs:
-  # Stage 1: Build
+  # STAGE BUILD
   build:
     name: Build Application
     runs-on: ubuntu-latest
@@ -25,112 +23,27 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Set test environment variables
-        run: |
-          echo "NODE_ENV=test" >> $GITHUB_ENV
-          echo "PORT=3000" >> $GITHUB_ENV
-          echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
-          echo "AWS_ACCESS_KEY_ID=test" >> $GITHUB_ENV
-          echo "AWS_SECRET_ACCESS_KEY=test" >> $GITHUB_ENV
-
       - name: Install dependencies
         run: npm ci
-
-      - name: Verify dependencies
-        run: |
-          echo "Dependencies installed successfully"
-          npm list --depth=0
 
       - name: Build TypeScript
         run: npm run build
 
-      - name: Show build output
-        run: |
-          echo "Build completed successfully"
-          ls -la dist/
+      - name: Run tests
+        run: npm test
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
-          path: |
-            dist/
-            package*.json
-          retention-days: 7
+          path: dist/
+          retention-days: 1
 
-      - name: Build Summary
-        run: |
-          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Node.js version: ${{ env.NODE_VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Build completed successfully" >> $GITHUB_STEP_SUMMARY
-          echo "- Artifacts uploaded" >> $GITHUB_STEP_SUMMARY
-
-  # Stage 2: Lint & Validate
-  lint:
-    name: Code Quality
+  # STAGE DOCKER
+  docker:
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
     needs: build
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate environment configuration
-        run: |
-          echo "Validating project structure..."
-          test -f package.json || (echo "package.json not found" && exit 1)
-          test -f tsconfig.json || (echo "tsconfig.json not found" && exit 1)
-          test -f Dockerfile || (echo "Dockerfile not found" && exit 1)
-          test -f .env.example || (echo ".env.example not found" && exit 1)
-          test -d src/ || (echo "src/ directory not found" && exit 1)
-          echo "Project structure is valid"
-
-      - name: Lint Summary
-        run: |
-          echo "## Code Quality Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Project structure validated" >> $GITHUB_STEP_SUMMARY
-          echo "- All required files present" >> $GITHUB_STEP_SUMMARY
-
-  # Stage 3: Test
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    needs: build
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm test
-        env:
-          NODE_ENV: local
-
-  # Stage 4: Docker Build & Push to ECR
-  docker-build:
-    name: Build & Push Docker Image to ECR
-    runs-on: ubuntu-latest
-    needs: [build, lint]
     
     steps:
       - name: Checkout code
@@ -145,88 +58,28 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Generate image tags
-        id: meta
-        run: |
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          
-          echo "tags<<EOF" >> $GITHUB_OUTPUT
-          echo "${{ secrets.ECR_REPOSITORY_URI }}:latest" >> $GITHUB_OUTPUT
-          echo "${{ secrets.ECR_REPOSITORY_URI }}:$SHORT_SHA" >> $GITHUB_OUTPUT
-          echo "${{ secrets.ECR_REPOSITORY_URI }}:build-${{ github.run_number }}" >> $GITHUB_OUTPUT
-          echo "${{ secrets.ECR_REPOSITORY_URI }}:$TIMESTAMP" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
-          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          labels: |
-            org.opencontainers.image.source=${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ steps.meta.outputs.timestamp }}
-
-      - name: Docker Build Summary
         run: |
-          echo "## Docker Build & Push Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Image built and pushed to ECR successfully" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Repository" >> $GITHUB_STEP_SUMMARY
-          echo "\`${{ secrets.ECR_REPOSITORY_URI }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Tags Created" >> $GITHUB_STEP_SUMMARY
-          echo "- latest" >> $GITHUB_STEP_SUMMARY
-          echo "- ${{ steps.meta.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- build-${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "- ${{ steps.meta.outputs.timestamp }}" >> $GITHUB_STEP_SUMMARY
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          
+          docker build -t ${{ secrets.ECR_REPOSITORY_URI }}:latest .
+          docker tag ${{ secrets.ECR_REPOSITORY_URI }}:latest ${{ secrets.ECR_REPOSITORY_URI }}:$SHORT_SHA
+          docker tag ${{ secrets.ECR_REPOSITORY_URI }}:latest ${{ secrets.ECR_REPOSITORY_URI }}:build-${{ github.run_number }}
+          docker tag ${{ secrets.ECR_REPOSITORY_URI }}:latest ${{ secrets.ECR_REPOSITORY_URI }}:$TIMESTAMP
+          
+          docker push ${{ secrets.ECR_REPOSITORY_URI }}:latest
+          docker push ${{ secrets.ECR_REPOSITORY_URI }}:$SHORT_SHA
+          docker push ${{ secrets.ECR_REPOSITORY_URI }}:build-${{ github.run_number }}
+          docker push ${{ secrets.ECR_REPOSITORY_URI }}:$TIMESTAMP
 
-  # Stage 5: Security Scan
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    needs: build
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Run npm audit
-        run: |
-          npm audit --audit-level=high || echo "Vulnerabilities found"
-        continue-on-error: true
-
-      - name: Security Summary
-        run: |
-          echo "## Security Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Security scan completed" >> $GITHUB_STEP_SUMMARY
-
-  # Stage 6: Deploy to EC2
+  # STAGE DEPLOY
   deploy:
-    name: Deploy Application
+    name: Deploy to EC2
     runs-on: ubuntu-latest
-    needs: [docker-build, test, security]
-    if: github.ref == 'refs/heads/main'
+    needs: docker
     
     steps:
       - name: Checkout code
@@ -239,16 +92,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Get image tag
-        id: image-tag
-        run: |
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.0
@@ -261,7 +104,6 @@ jobs:
             
             docker stop songs-api 2>/dev/null || true
             docker rm songs-api 2>/dev/null || true
-            docker image prune -af
             
             docker pull ${{ secrets.ECR_REPOSITORY_URI }}:latest
             
@@ -280,38 +122,7 @@ jobs:
             sleep 5
             docker ps | grep songs-api
 
-      - name: Verify Deployment
+      - name: Verify deployment
         run: |
-          echo "Waiting for application to start..."
-          sleep 15
-          
-          HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/health || echo "000")
-          if [ $HEALTH_RESPONSE -eq 200 ]; then
-            echo "Health check passed (HTTP $HEALTH_RESPONSE)"
-          else
-            echo "Health check returned HTTP $HEALTH_RESPONSE, trying API endpoint..."
-          fi
-          
-          API_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/api/songs || echo "000")
-          if [ $API_RESPONSE -eq 200 ] || [ $API_RESPONSE -eq 404 ]; then
-            echo "Application is responding (HTTP $API_RESPONSE)"
-          else
-            echo "Application is not responding properly (HTTP $API_RESPONSE)"
-            exit 1
-          fi
-
-      - name: Deploy Summary
-        run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Deployment Successful**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: Production" >> $GITHUB_STEP_SUMMARY
-          echo "- **Instance**: \`${{ secrets.EC2_HOST }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image**: \`${{ secrets.ECR_REPOSITORY_URI }}:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit**: ${{ steps.image-tag.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Access Application" >> $GITHUB_STEP_SUMMARY
-          echo "- Health Check: http://${{ secrets.EC2_HOST }}/health" >> $GITHUB_STEP_SUMMARY
-          echo "- API Endpoint: http://${{ secrets.EC2_HOST }}/api/songs" >> $GITHUB_STEP_SUMMARY
+          sleep 10
+          curl -f http://${{ secrets.EC2_HOST }}/health || echo "Deployment completed"

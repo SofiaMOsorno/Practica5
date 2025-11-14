@@ -219,7 +219,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- Security scan completed" >> $GITHUB_STEP_SUMMARY
 
-  # Stage 6: Deploy (Placeholder)
+  # Stage 6: Deploy to EC2
   deploy:
     name: Deploy Application
     runs-on: ubuntu-latest
@@ -230,14 +230,87 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy (placeholder)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get image tag
+        id: image-tag
         run: |
-          echo "Deploy stage - To be implemented"
-          echo "Future: Deploy to AWS, Kubernetes, etc."
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Login to ECR from EC2
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_URI }}
+            
+            # Stop and remove old container if exists
+            docker stop songs-api 2>/dev/null || true
+            docker rm songs-api 2>/dev/null || true
+            
+            # Remove old images to save space
+            docker image prune -af
+            
+            # Pull latest image
+            docker pull ${{ secrets.ECR_REPOSITORY_URI }}:latest
+            
+            # Run new container with production environment variables
+            docker run -d \
+              --name songs-api \
+              -p 80:3000 \
+              -e NODE_ENV=prod \
+              -e PORT=3000 \
+              -e AWS_REGION=${{ secrets.AWS_REGION }} \
+              -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+              -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+              --restart unless-stopped \
+              ${{ secrets.ECR_REPOSITORY_URI }}:latest
+            
+            # Wait for container to start
+            sleep 5
+            
+            # Verify container is running
+            docker ps | grep songs-api
+
+      - name: Verify Deployment
+        run: |
+          echo "Waiting for application to start..."
+          sleep 10
+          
+          # Health check
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/api/songs)
+          if [ $RESPONSE -eq 200 ] || [ $RESPONSE -eq 404 ]; then
+            echo "Application is responding"
+          else
+            echo "Application is not responding (HTTP $RESPONSE)"
+            exit 1
+          fi
 
       - name: Deploy Summary
         run: |
           echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Deployment stage prepared for future implementation" >> $GITHUB_STEP_SUMMARY
-          echo "- Environment: Production" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment Successful**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Production" >> $GITHUB_STEP_SUMMARY
+          echo "- **Instance**: \`${{ secrets.EC2_HOST }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ secrets.ECR_REPOSITORY_URI }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ steps.image-tag.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Access Application" >> $GITHUB_STEP_SUMMARY
+          echo "- API Endpoint: http://${{ secrets.EC2_HOST }}/api/songs" >> $GITHUB_STEP_SUMMARY

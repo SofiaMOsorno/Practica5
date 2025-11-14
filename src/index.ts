@@ -41,12 +41,14 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 if (process.env.NODE_ENV !== 'test') {
-    app.listen(config.port, () => {
-        console.log(`Server running on port ${config.port}`);
-        console.log(`Environment: ${config.nodeEnv}`);
-        console.log(`Health check: http://localhost:${config.port}/health`);
-        console.log(`Songs API: http://localhost:${config.port}/api/songs`);
-    });
+    if (process.env.NODE_ENV !== 'test') {
+        app.listen(config.port, '0.0.0.0', () => {
+            console.log(`Server running on port ${config.port}`);
+            console.log(`Environment: ${config.nodeEnv}`);
+            console.log(`Health check: http://localhost:${config.port}/health`);
+            console.log(`Songs API: http://localhost:${config.port}/api/songs`);
+        });
+    }
 }
 
 export default app;

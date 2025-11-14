@@ -96,27 +96,27 @@ jobs:
 
   # Stage 3: Test
   test:
-  name: Run Tests
-  runs-on: ubuntu-latest
-  needs: build
-  
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Run tests
-      run: npm test
-      env:
-        NODE_ENV: local
+      - name: Run tests
+        run: npm test
+        env:
+          NODE_ENV: local
 
   # Stage 4: Docker Build & Push to ECR
   docker-build:
@@ -249,20 +249,14 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Login to ECR from EC2
             aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_URI }}
             
-            # Stop and remove old container if exists
             docker stop songs-api 2>/dev/null || true
             docker rm songs-api 2>/dev/null || true
-            
-            # Remove old images to save space
             docker image prune -af
             
-            # Pull latest image
             docker pull ${{ secrets.ECR_REPOSITORY_URI }}:latest
             
-            # Run new container with production environment variables
             docker run -d \
               --name songs-api \
               -p 80:3000 \
@@ -275,10 +269,7 @@ jobs:
               --restart unless-stopped \
               ${{ secrets.ECR_REPOSITORY_URI }}:latest
             
-            # Wait for container to start
             sleep 5
-            
-            # Verify container is running
             docker ps | grep songs-api
 
       - name: Verify Deployment
@@ -286,23 +277,18 @@ jobs:
           echo "Waiting for application to start..."
           sleep 15
           
-          # Try health check first
           HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/health || echo "000")
-          
           if [ $HEALTH_RESPONSE -eq 200 ]; then
             echo "Health check passed (HTTP $HEALTH_RESPONSE)"
           else
             echo "Health check returned HTTP $HEALTH_RESPONSE, trying API endpoint..."
           fi
           
-          # Try API endpoint
           API_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/api/songs || echo "000")
-          
           if [ $API_RESPONSE -eq 200 ] || [ $API_RESPONSE -eq 404 ]; then
             echo "Application is responding (HTTP $API_RESPONSE)"
           else
             echo "Application is not responding properly (HTTP $API_RESPONSE)"
-            echo "Fetching container logs..."
             exit 1
           fi
 

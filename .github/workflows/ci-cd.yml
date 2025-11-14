@@ -94,35 +94,29 @@ jobs:
           echo "- Project structure validated" >> $GITHUB_STEP_SUMMARY
           echo "- All required files present" >> $GITHUB_STEP_SUMMARY
 
-  # Stage 3: Test (Placeholder)
+  # Stage 3: Test
   test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    needs: build
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  name: Run Tests
+  runs-on: ubuntu-latest
+  needs: build
+  
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+    - name: Install dependencies
+      run: npm ci
 
-      - name: Run tests (placeholder)
-        run: |
-          echo "Tests stage - To be implemented"
-          echo "Future: npm test"
-
-      - name: Test Summary
-        run: |
-          echo "## Test Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Tests stage prepared for future implementation" >> $GITHUB_STEP_SUMMARY
+    - name: Run tests
+      run: npm test
+      env:
+        NODE_ENV: local
 
   # Stage 4: Docker Build & Push to ECR
   docker-build:

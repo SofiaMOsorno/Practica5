@@ -37,8 +37,8 @@ function validateEnvironment(): EnvironmentConfig {
 
     const nodeEnv = process.env.NODE_ENV as 'local' | 'prod';
     
-    if (!['local', 'prod'].includes(nodeEnv)) {
-        throw new Error('NODE_ENV must be either "local" or "prod"');
+    if (!['local', 'prod', 'test'].includes(nodeEnv)) {
+        throw new Error('NODE_ENV must be either "local", "prod" or "test"');
     }
 
     return {

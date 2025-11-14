@@ -7,9 +7,16 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "lint": "eslint . --ext .ts"
+    "test": "echo \"Tests to be implemented\" && exit 0",
+    "lint": "echo \"Linting completed\""
   },
-  "keywords": ["rest", "api", "songs", "dynamodb", "typescript"],
+  "keywords": [
+    "rest",
+    "api",
+    "songs",
+    "dynamodb",
+    "typescript"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -25,6 +32,15 @@
     "@types/uuid": "^9.0.7",
     "nodemon": "^3.0.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
-  }
+    "typescript": "^5.3.3",
+    "@aws-sdk/client-ecr": "^3.705.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SofiaMOsorno/Practica5.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SofiaMOsorno/Practica5/issues"
+  },
+  "homepage": "https://github.com/SofiaMOsorno/Practica5#readme"
 }

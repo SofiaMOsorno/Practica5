@@ -41,6 +41,21 @@ function validateEnvironment(): EnvironmentConfig {
         );
     }
 
+    if (nodeEnv === 'test') {
+        return {
+            nodeEnv,
+            port: 3000,
+            aws: {
+                region: 'us-east-1',
+                accessKeyId: 'test',
+                secretAccessKey: 'test'
+            },
+            database: {
+                tableName: 'canciones_test'
+            }
+        };
+    }
+
     return {
         nodeEnv,
         port: parseInt(process.env.PORT || '3000', 10),

@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 interface EnvironmentConfig {
-    nodeEnv: 'local' | 'prod';
+    nodeEnv: 'local' | 'prod' | 'test';
     port: number;
     aws: {
         region: string;
@@ -28,26 +28,26 @@ function validateEnvironment(): EnvironmentConfig {
 
     const missing = requiredVars.filter(varName => !process.env[varName]);
 
-    if (missing.length > 0) {
-        throw new Error(
-        `Missing required environment variables: ${missing.join(', ')}\n` +
-        'Please check your .env file against .env.example'
-        );
-    }
-
-    const nodeEnv = process.env.NODE_ENV as 'local' | 'prod';
+    const nodeEnv = process.env.NODE_ENV as 'local' | 'prod' | 'test';
     
     if (!['local', 'prod', 'test'].includes(nodeEnv)) {
-        throw new Error('NODE_ENV must be either "local", "prod" or "test"');
+        throw new Error('NODE_ENV must be one of: local, prod, test');
+    }
+
+    if (nodeEnv !== 'test' && missing.length > 0) {
+        throw new Error(
+            `Missing required environment variables: ${missing.join(', ')}\n` +
+            'Please check your .env file against .env.example'
+        );
     }
 
     return {
         nodeEnv,
         port: parseInt(process.env.PORT || '3000', 10),
         aws: {
-            region: process.env.AWS_REGION!,
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+            region: process.env.AWS_REGION || '',
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
             sessionToken: process.env.AWS_SESSION_TOKEN,
             endpoint: process.env.AWS_ENDPOINT
         },

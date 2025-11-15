@@ -41,7 +41,7 @@ jobs:
 
   # STAGE DOCKER
   docker:
-    name: Build and Push Docker Image
+    name: Docker - Push Image to ECR
     runs-on: ubuntu-latest
     needs: build
     
@@ -60,7 +60,7 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push Docker image
+      - name: Docker - Push Image to ECR
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -128,7 +128,7 @@ jobs:
           curl -f http://${{ secrets.EC2_HOST }}/health || echo "Deployment completed"
           # FACTOR 12: ADMIN PROCESSES
   
-  # Factor 12
+  # STAGE ADMIN PROCESS
   admin-process:
     name: Run Admin Process - Purge Old Records
     runs-on: ubuntu-latest
@@ -151,6 +151,7 @@ jobs:
       - name: Run admin process
         env:
           NODE_ENV: prod
+          PORT: 3000
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

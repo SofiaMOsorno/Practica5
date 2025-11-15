@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "cross-env NODE_ENV=test jest",
-    "lint": "echo \"Linting completed\""
+    "admin": "ts-node scripts/adminProcess.ts"
   },
   "keywords": [
     "rest",
@@ -27,7 +27,6 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "@aws-sdk/client-ecr": "^3.705.0",
     "@types/express": "^4.17.21",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.10.5",
@@ -40,13 +39,5 @@
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/SofiaMOsorno/Practica5.git"
-  },
-  "bugs": {
-    "url": "https://github.com/SofiaMOsorno/Practica5/issues"
-  },
-  "homepage": "https://github.com/SofiaMOsorno/Practica5#readme"
+  }
 }

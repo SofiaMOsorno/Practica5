@@ -39,6 +39,8 @@ Practica5/
 │   ├── middlewares/
 │   │   └── errorHandler.ts    # Manejo de errores
 │   └── index.ts               # Punto de entrada
+├── scripts/
+│   └── adminProcess.ts        # Factor 12 - Proceso administrativo
 ├── tests/
 │   └── health.test.ts         # Test básico de salud
 ├── .env                        # Variables locales (no se sube)
@@ -104,6 +106,16 @@ npm test
 
 ---
 
+## Ejecutar Proceso Administrativo
+
+```bash
+npm run admin
+```
+
+Este comando ejecuta el script de purga de registros antiguos (Factor 12 de 12-Factor App). El script elimina canciones creadas hace más de 30 días de la tabla de DynamoDB correspondiente al ambiente configurado.
+
+---
+
 ## Endpoints de la API
 
 ### **Health Check**
@@ -162,7 +174,6 @@ Content-Type: application/json
 DELETE /api/songs/:id
 ```
 
-
 ## Pipeline de CI/CD
 
 El pipeline se ejecuta automáticamente en cada push a main:
@@ -182,7 +193,23 @@ El pipeline se ejecuta automáticamente en cada push a main:
 - Descarga imagen desde ECR
 - Despliega contenedor con variables de producción
 
----
+### **Stage 4: Admin Process**
+- Ejecuta proceso administrativo de purga
+- Elimina registros antiguos de la tabla de producción
+- Se ejecuta automáticamente después del deploy
+
+
+## Variables de Entorno
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `NODE_ENV` | Ambiente de ejecución | `local` o `prod` |
+| `PORT` | Puerto del servidor | `3000` |
+| `AWS_REGION` | Región de AWS | `us-east-1` |
+| `AWS_ACCESS_KEY_ID` | Access Key de AWS | `ASIA...` |
+| `AWS_SECRET_ACCESS_KEY` | Secret Key de AWS | `...` |
+| `AWS_SESSION_TOKEN` | Token de sesión (AWS Academy) | `IQoJb3...` |
+
 
 ## Configuración para AWS Academy
 
@@ -201,21 +228,24 @@ Actualiza estos secretos:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_SESSION_TOKEN`
-- `EC2_HOST` (si cambió la IP de tu EC2)
+- `EC2_HOST`
 
-#### **3. Re-run del pipeline (si es necesario)**
+#### **3. Verifica que EC2 esté corriendo**
+Asegúrate de que la instancia EC2 esté activa en la consola de AWS.
+
+#### **4. Re-run del pipeline (si es necesario)**
 Si el pipeline falló por credenciales expiradas:
 - Ve a Actions en GitHub
 - Selecciona el workflow fallido
 - Click en "Re-run all jobs"
 
----
 
 ## Aplicación Desplegada
 
 - **Base URL:** http://54.197.119.170
 - **Health Check:** http://54.197.119.170/health
 - **API Endpoint:** http://54.197.119.170/api/songs
+
 **Nota:** La IP puede cambiar cada vez que se reinicia el laboratorio de AWS.
 
 ## Docker
@@ -233,11 +263,22 @@ docker run -p 3000:3000 \
   songs-api
 ```
 
-## Base de Datos
+### **Versionado de Imágenes**
+Cada build genera 4 tags únicos para mantener historial de versiones:
+- latest - Siempre apunta a la versión más reciente
+- <commit-sha> - Identificador del commit de Git
+- build-<number> - Número secuencial del pipeline
+- <timestamp> - Marca temporal única
 
+Todas las versiones se publican en AWS ECR y están disponibles para deploy o rollback.
+
+## Base de Datos
 ### **Tablas DynamoDB**
 - **Local:** canciones_local
 - **Producción:** canciones_prod
+
+La selección de tabla se realiza dinámicamente mediante la variable NODE_ENV.
+
 
 ## Seguridad
 
@@ -245,3 +286,4 @@ docker run -p 3000:3000 \
 - Variables de entorno para toda configuración
 - .env excluido del control de versiones
 - Secretos manejados por GitHub Actions
+- Autenticación con AWS mediante credenciales temporales

@@ -126,7 +126,6 @@ jobs:
         run: |
           sleep 10
           curl -f http://${{ secrets.EC2_HOST }}/health || echo "Deployment completed"
-          # FACTOR 12: ADMIN PROCESSES
   
   # STAGE ADMIN PROCESS
   admin-process:

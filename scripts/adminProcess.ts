@@ -1,14 +1,7 @@
-/**
- * Admin Process - Factor 12 de 12-Factor App
- * 
- * Este script purga registros antiguos de la base de datos.
- * Se ejecuta como un proceso de administración one-off.
- */
-
 import { ScanCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { dynamoDb, tableName } from '../src/config/database';
 
-const DAYS_THRESHOLD = 30; // Eliminar registros de más de 30 días
+const DAYS_THRESHOLD = 30;
 
 async function purgeOldRecords() {
     console.log('Admin Process - Factor 12');
